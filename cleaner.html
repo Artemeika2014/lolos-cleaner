@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LoLOS Cleaner</title>
+<style>
+:root { --bg: linear-gradient(135deg, #1a1a3e, #2d1b69); --glass: rgba(255,255,255,0.08); --glass-border: rgba(255,255,255,0.15); --text: #fff; --accent: #7b5ea7; --danger: #ff3b30; --success: #4ade80; --warning: #ffbd2e; --info: #5bc0ff; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding: 20px; }
+.container { max-width: 900px; margin: 0 auto; }
+.header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; padding: 20px 24px; background: var(--glass); backdrop-filter: blur(20px); border-radius: 24px; border: 1px solid var(--glass-border); flex-wrap: wrap; gap: 12px; }
+.header h1 { font-size: 1.4rem; }
+.header .sub { font-size: 0.8rem; opacity: 0.6; margin-top: 2px; }
+.header .status { font-size: 0.75rem; padding: 6px 12px; border-radius: 20px; background: rgba(74,222,128,0.15); color: var(--success); border: 1px solid rgba(74,222,128,0.3); }
+.card { background: var(--glass); backdrop-filter: blur(20px); border-radius: 20px; padding: 24px; border: 1px solid var(--glass-border); margin-bottom: 16px; }
+.card h2 { font-size: 1rem; margin-bottom: 14px; font-weight: 600; }
+button { padding: 14px 20px; border: none; border-radius: 14px; font-size: 1rem; font-weight: 600; cursor: pointer; font-family: inherit; transition: all 0.2s; width: 100%; margin: 6px 0; background: var(--accent); color: white; }
+button:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(123,94,167,0.4); }
+button:active { transform: scale(0.98); }
+button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+button.secondary { background: rgba(255,255,255,0.1); }
+button.danger { background: var(--danger); }
+.warning { background: rgba(255,189,46,0.1); border: 1px solid rgba(255,189,46,0.3); border-radius: 12px; padding: 12px 16px; font-size: 0.85rem; margin: 12px 0; color: var(--warning); }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin: 16px 0; }
+.stat { background: rgba(255,255,255,0.05); border-radius: 12px; padding: 14px; text-align: center; border: 1px solid var(--glass-border); }
+.stat .num { font-size: 1.5rem; font-weight: 700; }
+.stat .label { font-size: 0.7rem; opacity: 0.6; margin-top: 4px; }
+.stat.green .num { color: var(--success); }
+.stat.red .num { color: #ff6b6b; }
+.stat.yellow .num { color: var(--warning); }
+.stat.blue .num { color: var(--info); }
+.list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.list { max-height: 400px; overflow-y: auto; background: rgba(0,0,0,0.2); border-radius: 12px; padding: 8px; font-family: 'Courier New', monospace; font-size: 0.8rem; }
+.list-item { padding: 8px 10px; border-radius: 8px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+.list-item:last-child { border-bottom: none; }
+.list-item input[type="checkbox"] { width: auto; margin: 0; accent-color: var(--danger); cursor: pointer; }
+.list-item .url { flex: 1; word-break: break-all; opacity: 0.85; }
+.list-item .size { font-size: 0.75rem; opacity: 0.5; white-space: nowrap; }
+.list-item .type { font-size: 0.7rem; padding: 2px 6px; border-radius: 6px; background: rgba(123,94,167,0.3); }
+.progress { margin-top: 12px; display: none; }
+.progress.active { display: block; }
+.progress-bar { width: 100%; height: 8px; background: rgba(255,255,255,0.1); border-radius: 10px; overflow: hidden; }
+.progress-bar .fill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent), var(--success)); transition: width 0.3s; }
+.progress-text { font-size: 0.8rem; opacity: 0.7; margin-top: 6px; text-align: center; }
+.console-log { background: #0a0a0f; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 14px; font-family: 'Courier New', monospace; font-size: 0.75rem; max-height: 200px; overflow-y: auto; margin-top: 12px; line-height: 1.6; display: none; }
+.console-log.active { display: block; }
+.console-log .log-line { color: #00ff88; }
+.console-log .log-err { color: #ff5f56; }
+.console-log .log-warn { color: #ffbd2e; }
+.console-log .log-info { color: #5bc0ff; }
+.danger-zone { border-color: rgba(255,59,48,0.3); }
+.danger-zone h2 { color: #ff6b6b; }
+</style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <div>
+            <h1>🧹 LoLOS Cleaner</h1>
+            <div class="sub">Поиск и удаление сирот в Cloudinary</div>
+        </div>
+        <div class="status" id="statusBadge">⏸️ Ожидание</div>
+    </div>
+    <div class="card">
+        <h2>📊 Cloudinary квота</h2>
+        <button onclick="checkUsage()" id="usageBtn">🔄 Проверить квоту</button>
+        <div id="usageResult" style="margin-top:12px;font-size:0.85rem;"></div>
+    </div>
+    <div class="card">
+        <h2>🔍 Сканирование</h2>
+        <button id="scanBtn" onclick="startScan()">▶️ Начать сканирование</button>
+        <div class="progress" id="scanProgress">
+            <div class="progress-bar"><div class="fill" id="scanFill"></div></div>
+            <div class="progress-text" id="scanText">0%</div>
+        </div>
+        <div class="console-log" id="consoleLog"></div>
+    </div>
+    <div class="card" id="resultsCard" style="display:none;">
+        <h2>📊 Результаты</h2>
+        <div class="stats">
+            <div class="stat green"><div class="num" id="statUsed">0</div><div class="label">✅ Используется</div></div>
+            <div class="stat red"><div class="num" id="statGarbage">0</div><div class="label">🗑️ Мусор</div></div>
+            <div class="stat yellow"><div class="num" id="statBroken">0</div><div class="label">⚠️ Битые ссылки</div></div>
+            <div class="stat blue"><div class="num" id="statProtected">0</div><div class="label">🛡️ Защищено</div></div>
+            <div class="stat"><div class="num" id="statTotal">0</div><div class="label">📦 Всего</div></div>
+            <div class="stat"><div class="num" id="statSize">0 МБ</div><div class="label">💾 Мусор весит</div></div>
+        </div>
+    </div>
+    <div class="card danger-zone" id="garbageCard" style="display:none;">
+        <div class="list-header">
+            <h2>🗑️ Мусор в Cloudinary</h2>
+            <div><span id="garbageCount">0</span> файлов</div>
+        </div>
+        <div style="margin-bottom:10px;">
+            <button class="secondary" onclick="toggleAllGarbage(true)" style="width:auto;padding:8px 16px;font-size:0.85rem;display:inline-block;margin-right:8px;">✅ Все</button>
+            <button class="secondary" onclick="toggleAllGarbage(false)" style="width:auto;padding:8px 16px;font-size:0.85rem;display:inline-block;">❌ Ничего</button>
+        </div>
+        <div class="list" id="garbageList"></div>
+        <button class="danger" onclick="deleteSelectedGarbage()" id="deleteBtn" style="margin-top:16px;">🗑️ Удалить выбранные</button>
+        <div class="progress" id="deleteProgress">
+            <div class="progress-bar"><div class="fill" id="deleteFill"></div></div>
+            <div class="progress-text" id="deleteText">0%</div>
+        </div>
+    </div>
+    <div class="card" id="brokenCard" style="display:none;">
+        <div class="list-header">
+            <h2>⚠️ Битые ссылки</h2>
+            <div><span id="brokenCount">0</span></div>
+        </div>
+        <div class="list" id="brokenList"></div>
+    </div>
+    <div class="card" id="protectedCard" style="display:none;">
+        <div class="list-header">
+            <h2>🛡️ Защищённые</h2>
+            <div><span id="protectedCount">0</span></div>
+        </div>
+        <div class="list" id="protectedList"></div>
+    </div>
+</div>
+<script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore-compat.js"></script>
+<script>
+firebase.initializeApp({
+    apiKey: "AIzaSyD9wOAfJ_hVfs9Xt0REXhc4G010LRqtv3s",
+    authDomain: "lolos-51c9c.firebaseapp.com",
+    projectId: "lolos-51c9c",
+    storageBucket: "lolos-51c9c.firebasestorage.app",
+    messagingSenderId: "143157807464",
+    appId: "1:143157807464:web:1a1e257800cbc341656edd"
+});
+const db = firebase.firestore();
+const PROTECTED_PREFIXES = ['lolos_4_', 'lolos_5_'];
+const PROTECTED_EXACT = ['lolos_4_1', 'lolos_4_1_1', 'lolos_4_2', 'lolos_5_0', 'lolos_5_1', 'lolos_5_2', 'lolos_5_3'];
+let cloudinaryResources = [];
+let usedUrls = new Set();
+let usedPublicIds = new Set();
+let garbage = [];
+let brokenLinks = [];
+let protectedFiles = [];
+function getApiUrl() { return '/api/list'; }
+function clog(msg, type = '') {
+    const log = document.getElementById('consoleLog');
+    log.classList.add('active');
+    const line = document.createElement('div');
+    line.className = 'log-line ' + (type ? 'log-' + type : '');
+    line.textContent = '[' + new Date().toLocaleTimeString() + '] ' + msg;
+    log.appendChild(line);
+    log.scrollTop = log.scrollHeight;
+    console.log(msg);
+}
+function escapeHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function formatBytes(b) {
+    if (!b) return '0 Б';
+    if (b < 1024) return b + ' Б';
+    if (b < 1024*1024) return (b/1024).toFixed(1) + ' КБ';
+    return (b/(1024*1024)).toFixed(2) + ' МБ';
+}
+async function checkUsage() {
+    const btn = document.getElementById('usageBtn');
+    btn.disabled = true; btn.textContent = '⏳ Проверка...';
+    try {
+        const res = await fetch(getApiUrl() + '?action=usage');
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+        const storage = data.storage || {};
+        const used = storage.usage || 0;
+        const limit = storage.limit || 0;
+        const percent = limit > 0 ? (used / limit * 100) : 0;
+        const usedMB = (used / 1024 / 1024).toFixed(1);
+        const limitGB = (limit / 1024 / 1024 / 1024).toFixed(0);
+        const color = percent > 80 ? '#ff6b6b' : percent > 60 ? '#ffbd2e' : '#4ade80';
+        document.getElementById('usageResult').innerHTML = `
+            <div style="font-size:1.1rem;font-weight:600;color:${color};">${usedMB} МБ / ${limitGB} ГБ (${percent.toFixed(1)}%)</div>
+            <div style="margin-top:10px;background:rgba(0,0,0,0.3);border-radius:8px;overflow:hidden;height:12px;">
+                <div style="width:${percent}%;height:100%;background:${color};transition:width 0.5s;"></div>
+            </div>
+            <div style="margin-top:8px;opacity:0.6;">Resources: ${data.resources || 0} · Derived: ${data.derived_resources || 0}</div>
+        `;
+        clog('✅ Квота: ' + usedMB + ' МБ / ' + limitGB + ' ГБ', 'info');
+    } catch (e) {
+        document.getElementById('usageResult').innerHTML = '<div style="color:#ff6b6b;">❌ ' + escapeHtml(e.message) + '</div>';
+        clog('❌ Ошибка: ' + e.message, 'err');
+    } finally { btn.disabled = false; btn.textContent = '🔄 Проверить квоту'; }
+}
+async function listType(type) {
+    let all = [];
+    let cursor = null;
+    let page = 0;
+    while (page < 200) {
+        let url = getApiUrl() + '?action=list&type=' + type;
+        if (cursor) url += '&next_cursor=' + encodeURIComponent(cursor);
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+        all = all.concat(data.resources || []);
+        if (!data.next_cursor) break;
+        cursor = data.next_cursor;
+        page++;
+    }
+    return all;
+}
+function extractPublicId(url) {
+    if (!url || typeof url !== 'string') return null;
+    if (!url.startsWith('http')) return null;
+    const m = url.match(/res\.cloudinary\.com\/[^/]+\/(image|video|raw)\/upload\/(?:v\d+\/)?(.+?)(?:\?|$)/);
+    if (!m) return null;
+    return decodeURIComponent(m[2]);
+}
+function collectFromValue(value, urls, ids) {
+    if (!value) return;
+    if (typeof value === 'string') {
+        if (value.startsWith('http') && value.includes('cloudinary.com')) {
+            urls.add(value);
+            const pid = extractPublicId(value);
+            if (pid) ids.add(pid);
+        }
+        return;
+    }
+    if (Array.isArray(value)) { value.forEach(v => collectFromValue(v, urls, ids)); return; }
+    if (typeof value === 'object') for (const k of Object.keys(value)) collectFromValue(value[k], urls, ids);
+}
+async function scanFirestore() {
+    const urls = new Set(), ids = new Set();
+    const cols = ['users', 'lolallapps', 'Otzivi', 'published_os'];
+    for (const colName of cols) {
+        try {
+            clog('Firestore: ' + colName + '...', 'info');
+            const snap = await db.collection(colName).get();
+            snap.forEach(doc => collectFromValue(doc.data(), urls, ids));
+            clog('  ✅ ' + colName + ': ' + snap.size + ' док.', 'info');
+        } catch (e) { clog('  ⚠️ ' + colName + ': ' + e.message, 'warn'); }
+    }
+    return { urls, ids };
+}
+async function startScan() {
+    const btn = document.getElementById('scanBtn');
+    btn.disabled = true; btn.textContent = '⏳ Сканирование...';
+    const prog = document.getElementById('scanProgress');
+    const fill = document.getElementById('scanFill');
+    const text = document.getElementById('scanText');
+    prog.classList.add('active');
+    document.getElementById('consoleLog').innerHTML = '';
+    document.getElementById('statusBadge').textContent = '⏳ Сканирование';
+    try {
+        text.textContent = 'Firestore...'; fill.style.width = '10%';
+        const { urls, ids } = await scanFirestore();
+        usedUrls = urls; usedPublicIds = ids;
+        text.textContent = 'Cloudinary...'; fill.style.width = '30%';
+        cloudinaryResources = [];
+        for (const type of ['image', 'video', 'raw']) {
+            try {
+                clog('Cloudinary: ' + type + '...', 'info');
+                const resources = await listType(type);
+                clog('  ✅ ' + type + ': ' + resources.length, 'info');
+                resources.forEach(r => cloudinaryResources.push({ ...r, _type: type }));
+                fill.style.width = (30 + ['image','video','raw'].indexOf(type) * 20 + 20) + '%';
+            } catch (e) { clog('  ⚠️ ' + type + ': ' + e.message, 'warn'); }
+        }
+        text.textContent = 'Сравнение...'; fill.style.width = '90%';
+        garbage = []; brokenLinks = []; protectedFiles = [];
+        const usedIdsLower = new Set([...usedPublicIds].map(x => x.toLowerCase()));
+        const usedUrlsLower = new Set([...usedUrls].map(x => x.toLowerCase()));
+        for (const r of cloudinaryResources) {
+            const pid = r.public_id;
+            const isProtected = PROTECTED_EXACT.includes(pid) || PROTECTED_PREFIXES.some(p => pid.startsWith(p));
+            if (isProtected) { protectedFiles.push(r); continue; }
+            if (!usedIdsLower.has(pid.toLowerCase()) && !usedUrlsLower.has((r.secure_url || '').toLowerCase())) {
+                garbage.push(r);
+            }
+        }
+        const cIds = new Set(cloudinaryResources.map(r => r.public_id.toLowerCase()));
+        for (const pid of usedPublicIds) if (!cIds.has(pid.toLowerCase())) brokenLinks.push(pid);
+        fill.style.width = '100%'; text.textContent = '✅ Готово';
+        document.getElementById('statusBadge').textContent = '✅ Готово';
+        clog('✅ Мусор: ' + garbage.length + ', битых: ' + brokenLinks.length + ', защищено: ' + protectedFiles.length, 'info');
+        renderResults();
+    } catch (e) {
+        clog('❌ Ошибка: ' + e.message, 'err');
+        text.textContent = '❌ ' + e.message;
+        document.getElementById('statusBadge').textContent = '❌ Ошибка';
+    } finally {
+        btn.disabled = false; btn.textContent = '▶️ Начать сканирование';
+    }
+}
+function renderResults() {
+    document.getElementById('resultsCard').style.display = 'block';
+    const usedCount = cloudinaryResources.length - garbage.length - protectedFiles.length;
+    document.getElementById('statUsed').textContent = usedCount;
+    document.getElementById('statGarbage').textContent = garbage.length;
+    document.getElementById('statBroken').textContent = brokenLinks.length;
+    document.getElementById('statProtected').textContent = protectedFiles.length;
+    document.getElementById('statTotal').textContent = cloudinaryResources.length;
+    const garbageSize = garbage.reduce((s, r) => s + (r.bytes || 0), 0);
+    document.getElementById('statSize').textContent = formatBytes(garbageSize);
+    if (garbage.length > 0) {
+        document.getElementById('garbageCard').style.display = 'block';
+        document.getElementById('garbageCount').textContent = garbage.length;
+        document.getElementById('garbageList').innerHTML = garbage.map((r, i) => `
+            <div class="list-item">
+                <input type="checkbox" data-idx="${i}" class="garbage-check" checked>
+                <span class="type">${r._type}</span>
+                <span class="url">${escapeHtml(r.public_id)}</span>
+                <span class="size">${formatBytes(r.bytes)}</span>
+            </div>
+        `).join('');
+    } else document.getElementById('garbageCard').style.display = 'none';
+    if (brokenLinks.length > 0) {
+        document.getElementById('brokenCard').style.display = 'block';
+        document.getElementById('brokenCount').textContent = brokenLinks.length;
+        document.getElementById('brokenList').innerHTML = brokenLinks.map(b => `<div class="list-item"><span class="url">${escapeHtml(b)}</span></div>`).join('');
+    } else document.getElementById('brokenCard').style.display = 'none';
+    if (protectedFiles.length > 0) {
+        document.getElementById('protectedCard').style.display = 'block';
+        document.getElementById('protectedCount').textContent = protectedFiles.length;
+        document.getElementById('protectedList').innerHTML = protectedFiles.map(r => `<div class="list-item"><span class="url">🛡️ ${escapeHtml(r.public_id)}</span></div>`).join('');
+    } else document.getElementById('protectedCard').style.display = 'none';
+}
+function toggleAllGarbage(checked) { document.querySelectorAll('.garbage-check').forEach(cb => cb.checked = checked); }
+async function deleteSelectedGarbage() {
+    const checked = [...document.querySelectorAll('.garbage-check:checked')];
+    if (checked.length === 0) { alert('❌ Ничего не выбрано'); return; }
+    if (!confirm('🗑️ Удалить ' + checked.length + ' файлов?\n\nЭто необратимо!')) return;
+    const btn = document.getElementById('deleteBtn');
+    btn.disabled = true; btn.textContent = '⏳ Удаление...';
+    const prog = document.getElementById('deleteProgress');
+    const fill = document.getElementById('deleteFill');
+    const text = document.getElementById('deleteText');
+    prog.classList.add('active');
+    let done = 0, errors = 0;
+    for (const cb of checked) {
+        const idx = parseInt(cb.dataset.idx);
+        const res = garbage[idx];
+        try {
+            const delRes = await fetch(getApiUrl() + '?action=delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ public_id: res.public_id, type: res._type })
+            });
+            const delData = await delRes.json();
+            if (delData.error) throw new Error(delData.error);
+            done++;
+            clog('🗑️ ' + res.public_id, 'info');
+        } catch (e) { errors++; clog('❌ ' + res.public_id + ': ' + e.message, 'err'); }
+        fill.style.width = Math.round(((done + errors) / checked.length) * 100) + '%';
+        text.textContent = (done + errors) + ' / ' + checked.length + ' (✅ ' + done + ', ❌ ' + errors + ')';
+        await new Promise(r => setTimeout(r, 250));
+    }
+    btn.disabled = false; btn.textContent = '🗑️ Удалить выбранные';
+    text.textContent = '✅ Удалено: ' + done + ', ошибок: ' + errors;
+    alert('Готово!\n✅ Удалено: ' + done + '\n❌ Ошибок: ' + errors);
+}
+document.addEventListener('DOMContentLoaded', () => { checkUsage(); });
+</script>
+</body>
+</html>
